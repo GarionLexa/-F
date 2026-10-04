@@ -254,6 +254,151 @@
             background: rgba(255,255,255,0.15);
             color: white;
         }
+        
+        /* НОВЫЕ СТИЛИ ДЛЯ 3D КАФЕ И АДАПТИВА */
+        .cafe-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 50vh;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
+        }
+
+        /* ИГРОВОЙ ПОЛНОЭКРАННЫЙ РЕЖИМ */
+        body.game-mode {
+            overflow: hidden !important;
+        }
+        body.game-mode header, body.game-mode #view-route {
+            display: none !important;
+        }
+        body.game-mode #view-cafe {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 9999;
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+            border: none;
+            padding: 0;
+            margin: 0;
+            background: #000;
+        }
+        body.game-mode .setup-panel {
+            display: none !important; /* Прячем настройки при входе */
+        }
+        body.game-mode .cafe-container {
+            min-height: 100vh;
+            border-radius: 0;
+        }
+        
+        /* Игровой UI поверх экрана */
+        .game-ui-top {
+            display: none;
+            position: absolute;
+            top: 15px; left: 15px; right: 15px;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 30;
+        }
+        body.game-mode .game-ui-top {
+            display: flex;
+        }
+        
+        .game-ui-bottom {
+            display: none;
+            position: absolute;
+            bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 600px;
+            z-index: 30;
+        }
+        body.game-mode .game-ui-bottom {
+            display: flex;
+            gap: 10px;
+        }
+
+        #cafe-canvas-root {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            outline: none;
+            touch-action: none; /* Запрещаем скролл браузера при тапе по игре */
+        }
+        /* Анимация ходьбы (покачивание) */
+        @keyframes walk {
+            0% { transform: translateX(-50%) rotate(-5deg); }
+            50% { transform: translateX(-50%) rotate(5deg); }
+            100% { transform: translateX(-50%) rotate(-5deg); }
+        }
+        .is-walking .avatar-body {
+            animation: walk 0.4s infinite ease-in-out;
+        }
+        
+        /* Кнопка выхода из игры */
+        .btn-exit-game {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            backdrop-filter: blur(8px);
+            pointer-events: auto;
+        }
+
+        /* Кнопки навигации табов */
+        .nav-tab {
+            transition: all 0.2s;
+        }
+
+        .chat-bubble-3d {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            color: #000;
+            padding: 8px 14px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            opacity: 0;
+            animation: bubblePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .chat-bubble-3d::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: rgba(255, 255, 255, 0.95) transparent transparent transparent;
+        }
+
+        .name-tag-3d {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: bold;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(4px);
+        }
+
+        @keyframes bubblePop {
+            from { opacity: 0; transform: translate(-50%, -80%) scale(0.5); }
+            to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+        }
     </style>
 </head>
 <body class="antialiased selection:bg-amber-500 selection:text-black min-h-screen flex flex-col">
@@ -402,30 +547,86 @@
         </section>
         </div> <!-- Конец view-route -->
 
-        <div id="view-cafe" class="hidden h-[600px] flex-col glass-panel rounded-3xl border border-white/10 p-4">
+        <!-- СЕКЦИЯ КАФЕ (АДАПТИВНАЯ) -->
+        <div id="view-cafe" class="hidden flex-col glass-panel rounded-3xl border border-white/10 p-4 md:p-6 shadow-2xl w-full" style="min-height: 80vh;">
             
-            <div class="mb-4 flex justify-between items-end">
-                <div>
-                    <h2 class="text-2xl font-black text-amber-400 tracking-wider">ПРИДОРОЖНАЯ КАФЕШКА</h2>
-                    <p class="text-sm text-gray-400">Кликай по полу, чтобы ходить. Пиши в чат, чтобы говорить.</p>
+            <div class="flex flex-col lg:flex-row gap-6 h-full flex-1">
+                
+                <!-- ПАНЕЛЬ НАСТРОЙКИ АВАТАРА (Скроется при входе в игру) -->
+                <div class="setup-panel w-full lg:w-80 flex flex-col gap-5">
+                    <div class="bg-black/40 rounded-2xl p-5 border border-white/5 shadow-inner">
+                        <div>
+                            <h3 class="text-xl font-black text-white tracking-wide">Твой персонаж</h3>
+                            <p class="text-xs text-gray-400 mt-1">Настрой вид для мультиплеера</p>
+                        </div>
+                        
+                        <div class="space-y-4 text-sm mt-5">
+                            <div>
+                                <label class="block text-gray-400 mb-1.5 font-medium">Никнейм</label>
+                                <input type="text" id="custName" value="Водитель" class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-1 focus:ring-amber-500 outline-none transition-all">
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="flex-1">
+                                    <label class="block text-gray-400 mb-1.5 font-medium">Цвет куртки</label>
+                                    <input type="color" id="custShirtColor" value="#ea580c" class="w-full h-12 rounded-lg cursor-pointer border-0 bg-black/60">
+                                </div>
+                                <div class="flex-1">
+                                    <label class="block text-gray-400 mb-1.5 font-medium">Цвет волос</label>
+                                    <input type="color" id="custHairColor" value="#1f2937" class="w-full h-12 rounded-lg cursor-pointer border-0 bg-black/60">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button id="joinCafeBtn" class="btn-tangent w-full mt-6 text-black font-black uppercase tracking-wider py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
+                            </svg>
+                            ВЫЙТИ ИЗ МАШИНЫ
+                        </button>
+                    </div>
                 </div>
-                <div class="text-xs bg-green-900/50 text-green-400 px-2 py-1 rounded border border-green-500/30">
-                    Людей в комнате: <span id="room-count">4</span>
+
+                <!-- 3D ЗОНА КАФЕ / ГОРОДА -->
+                <div class="flex-1 flex flex-col relative w-full h-[50vh] lg:h-auto min-h-[300px]">
+                    
+                    <!-- ХОЛСТ ДЛЯ 3D ИГРЫ (Восстановлен!) -->
+                    <div id="cafe-canvas-root"></div>
+
+                    <!-- Игровой UI: Шапка (Онлайн и Выход) -->
+                    <div class="game-ui-top">
+                        <button id="exitGameBtn" class="btn-exit-game px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                            В фуру
+                        </button>
+                        <div class="text-xs font-bold bg-green-950/80 text-green-400 px-3 py-2 rounded-xl border border-green-500/30 flex items-center gap-2 backdrop-blur-md shadow-lg pointer-events-auto">
+                            <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            В сети: <span id="room-count">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Игровой UI: Чат внизу экрана -->
+                    <div class="game-ui-bottom">
+                        <!-- НОВАЯ КНОПКА МИКРОФОНА (Скрыта по умолчанию) -->
+                        <button id="proximity-mic-btn" class="hidden bg-gradient-to-r from-red-500 to-red-700 text-white p-3 md:px-4 rounded-xl transition-all shadow-[0_4px_15px_rgba(239,68,68,0.5)] border border-red-400/50 pointer-events-auto items-center justify-center mr-2 active:scale-95">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                            </svg>
+                        </button>
+                        
+                        <input type="text" id="avatarInput" autocomplete="off" class="flex-1 bg-black/60 text-white font-bold rounded-xl px-4 py-3 md:py-4 border border-white/20 focus:outline-none focus:border-amber-500 transition-all shadow-[0_4px_15px_rgba(0,0,0,0.5)] backdrop-blur-md pointer-events-auto" placeholder="Написать всем...">
+                        
+                        <button id="avatarSendBtn" class="btn-tangent text-black font-black p-3 md:px-6 rounded-xl transition-all shadow-[0_4px_15px_rgba(245,158,11,0.4)] pointer-events-auto flex items-center justify-center ml-2">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Слой для 2D элементов (Ники и Облака чата) -->
+                    <div id="ui-overlay" class="absolute inset-0 pointer-events-none z-20 w-full h-full overflow-hidden"></div>
                 </div>
-            </div>
 
-            <!-- Игровая зона 2D -->
-            <div id="room-2d-area" class="room-2d flex-1 w-full mb-4 relative">
-                <!-- Сюда будут добавляться аватары JS-скриптом -->
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white/5 font-black text-4xl select-none pointer-events-none">ПАРКОВКА</div>
             </div>
-
-            <!-- Ввод сообщения для аватара -->
-            <div class="flex gap-3">
-                <input type="text" id="avatarInput" autocomplete="off" class="w-full bg-black/60 text-white rounded-xl px-4 py-3 border border-white/10 focus:outline-none focus:border-amber-500 transition-all placeholder-gray-500" placeholder="Что скажешь коллегам?">
-                <button id="avatarSendBtn" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-6 py-3 rounded-xl transition-colors">Сказать</button>
-            </div>
-
         </div>
 
     </main>
@@ -622,151 +823,717 @@
                 viewRoute.classList.remove('block');
                 viewRoute.classList.add('hidden');
                 statusIndicator.textContent = "НА ОТДЫХЕ";
+                
+                // Исправляем размер 3D канваса при открытии вкладки
+                if (cafeEngine && cafeEngine.renderer) {
+                    cafeEngine.resize();
+                }
             });
 
 
-            const roomArea = document.getElementById('room-2d-area');
+            /* ========================================================
+               4. 3D ДВИЖОК КАФЕ (THREE.JS) - BRAWL STARS STYLE
+               ======================================================== */
+            
+            class Cafe3DEngine {
+                constructor() {
+                    this.container = document.getElementById('cafe-canvas-root');
+                    this.uiOverlay = document.getElementById('ui-overlay');
+                    this.scene = new THREE.Scene();
+                    this.scene.background = new THREE.Color(0x87CEEB); // Яркое небо
+                    
+                    // Brawl Stars style Изометрическая камера
+                    const aspect = this.container.clientWidth / this.container.clientHeight;
+                    // Используем Perspective, но с малым FOV для эффекта изометрии
+                    this.camera = new THREE.PerspectiveCamera(35, aspect, 1, 200);
+                    // Камера висит высоко под углом
+                    this.cameraOffset = new THREE.Vector3(0, 30, 40); 
+                    this.camera.position.copy(this.cameraOffset);
+                    this.camera.lookAt(0, 0, 0);
+
+                    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+                    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    this.renderer.shadowMap.enabled = true;
+                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    this.container.appendChild(this.renderer.domElement);
+
+                    this.players = {};
+                    this.myId = null;
+                    this.raycaster = new THREE.Raycaster();
+                    this.mouse = new THREE.Vector2();
+                    this.clock = new THREE.Clock();
+
+                    this.buildMap();
+                    this.setupEvents();
+
+                    this.animate = this.animate.bind(this);
+                    requestAnimationFrame(this.animate);
+                }
+
+                buildMap() {
+                    // Освещение (Яркое, контрастное)
+                    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                    this.scene.add(ambientLight);
+
+                    const dirLight = new THREE.DirectionalLight(0xfff5b6, 0.8); // Теплый солнечный свет
+                    dirLight.position.set(20, 40, 20);
+                    dirLight.castShadow = true;
+                    dirLight.shadow.mapSize.width = 2048;
+                    dirLight.shadow.mapSize.height = 2048;
+                    dirLight.shadow.camera.near = 10;
+                    dirLight.shadow.camera.far = 100;
+                    dirLight.shadow.camera.left = -30;
+                    dirLight.shadow.camera.right = 30;
+                    dirLight.shadow.camera.top = 30;
+                    dirLight.shadow.camera.bottom = -30;
+                    this.scene.add(dirLight);
+
+                    // --- ГЕНЕРАЦИЯ КАРТЫ ---
+                    const mapGroup = new THREE.Group();
+
+                    // 1. Парковка (Слева: x от -30 до 0)
+                    const parkingGeo = new THREE.PlaneGeometry(30, 40);
+                    const parkingMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.9 });
+                    const parking = new THREE.Mesh(parkingGeo, parkingMat);
+                    parking.rotation.x = -Math.PI / 2;
+                    parking.position.set(-15, 0, 0);
+                    parking.receiveShadow = true;
+                    mapGroup.add(parking);
+
+                    // Линии парковки
+                    const lineGeo = new THREE.PlaneGeometry(0.5, 10);
+                    const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                    for(let z = -15; z <= 15; z += 10) {
+                        const line = new THREE.Mesh(lineGeo, lineMat);
+                        line.rotation.x = -Math.PI / 2;
+                        line.position.set(-10, 0.01, z);
+                        mapGroup.add(line);
+                    }
+
+                    // 2. Зеленая зона / Кафе (Справа: x от 0 до 30)
+                    const grassGeo = new THREE.PlaneGeometry(30, 40);
+                    const grassMat = new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 1 });
+                    const grass = new THREE.Mesh(grassGeo, grassMat);
+                    grass.rotation.x = -Math.PI / 2;
+                    grass.position.set(15, 0, 0);
+                    grass.receiveShadow = true;
+                    mapGroup.add(grass);
+                    
+                    // Разделительный бордюр
+                    const borderGeo = new THREE.BoxGeometry(1, 0.5, 40);
+                    const borderMat = new THREE.MeshStandardMaterial({ color: 0xe5e7eb });
+                    const border = new THREE.Mesh(borderGeo, borderMat);
+                    border.position.set(0, 0.25, 0);
+                    border.castShadow = true;
+                    border.receiveShadow = true;
+                    mapGroup.add(border);
+
+                    // 3. Здание Кафе (Справа)
+                    const cafeBldgGeo = new THREE.BoxGeometry(16, 8, 12);
+                    const cafeBldgMat = new THREE.MeshStandardMaterial({ color: 0xffedd5 });
+                    const cafeBldg = new THREE.Mesh(cafeBldgGeo, cafeBldgMat);
+                    cafeBldg.position.set(20, 4, -5);
+                    cafeBldg.castShadow = true;
+                    cafeBldg.receiveShadow = true;
+                    mapGroup.add(cafeBldg);
+
+                    // Крыша кафе (красная)
+                    const roofGeo = new THREE.ConeGeometry(12, 5, 4);
+                    const roofMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+                    const roof = new THREE.Mesh(roofGeo, roofMat);
+                    roof.rotation.y = Math.PI / 4;
+                    roof.position.set(20, 10.5, -5);
+                    roof.castShadow = true;
+                    mapGroup.add(roof);
+
+                    // 4. Фура на парковке (Декорация слева)
+                    this.createDecorativeTruck(mapGroup, -20, -10, 0x3b82f6); // Синяя фура
+                    this.createDecorativeTruck(mapGroup, -20, 10, 0xf59e0b);  // Желтая фура
+
+                    this.scene.add(mapGroup);
+                    // Сохраняем плоскости для raycaster
+                    this.floorPlanes = [parking, grass];
+                }
+
+                createDecorativeTruck(parent, x, z, cabColor) {
+                    const truckGroup = new THREE.Group();
+                    // Прицеп
+                    const trailer = new THREE.Mesh(new THREE.BoxGeometry(6, 7, 16), new THREE.MeshStandardMaterial({color: 0xf3f4f6}));
+                    trailer.position.set(0, 4.5, -4);
+                    trailer.castShadow = true;
+                    truckGroup.add(trailer);
+                    // Кабина
+                    const cab = new THREE.Mesh(new THREE.BoxGeometry(6, 6, 6), new THREE.MeshStandardMaterial({color: cabColor}));
+                    cab.position.set(0, 4, 7);
+                    cab.castShadow = true;
+                    truckGroup.add(cab);
+                    
+                    truckGroup.position.set(x, 0, z);
+                    truckGroup.rotation.y = Math.PI / 2; // Поворачиваем мордой к кафе
+                    parent.add(truckGroup);
+                }
+
+                setupEvents() {
+                    window.addEventListener('resize', () => this.resize());
+                    
+                    // Тап для движения (Touch & Mouse)
+                    this.container.addEventListener('pointerdown', (e) => {
+                        if (!this.myId || !this.players[this.myId]) return;
+
+                        const rect = this.container.getBoundingClientRect();
+                        this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                        this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+                        this.raycaster.setFromCamera(this.mouse, this.camera);
+                        const intersects = this.raycaster.intersectObjects(this.floorPlanes);
+
+                        if (intersects.length > 0) {
+                            const point = intersects[0].point;
+                            this.players[this.myId].setTarget(point.x, point.z);
+                            this.createClickMarker(point);
+                        }
+                    });
+                }
+
+                createClickMarker(pos) {
+                    const geo = new THREE.RingGeometry(0.3, 0.8, 16);
+                    const mat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.rotation.x = -Math.PI / 2;
+                    mesh.position.copy(pos);
+                    mesh.position.y = 0.2; // Чуть выше земли
+                    this.scene.add(mesh);
+
+                    let s = 1;
+                    const anim = setInterval(() => {
+                        s += 0.15;
+                        mesh.scale.set(s, s, s);
+                        mesh.material.opacity -= 0.1;
+                        if(mesh.material.opacity <= 0) {
+                            clearInterval(anim);
+                            this.scene.remove(mesh);
+                        }
+                    }, 30);
+                }
+
+                resize() {
+                    if (!this.container) return;
+                    const width = this.container.clientWidth;
+                    const height = this.container.clientHeight;
+                    this.renderer.setSize(width, height);
+                    this.camera.aspect = width / height;
+                    this.camera.updateProjectionMatrix();
+                }
+
+                addPlayer(id, name, colors, x, z, isBot = false) {
+                    const player = new Avatar3D(this.scene, name, colors, isBot);
+                    player.setPosition(x, z);
+                    
+                    const nameTag = document.createElement('div');
+                    nameTag.className = 'name-tag-3d';
+                    nameTag.textContent = name;
+                    this.uiOverlay.appendChild(nameTag);
+                    player.uiElement = nameTag;
+
+                    this.players[id] = player;
+                    const countEl = document.getElementById('room-count');
+                    if(countEl) countEl.textContent = Object.keys(this.players).length;
+                    return player;
+                }
+
+                animate() {
+                    requestAnimationFrame(this.animate);
+                    const delta = this.clock.getDelta();
+                    const time = this.clock.getElapsedTime();
+
+                    // Логика камеры: следим за игроком
+                    if (this.myId && this.players[this.myId]) {
+                        const myPlayerPos = this.players[this.myId].group.position;
+                        
+                        // Плавное следование камеры (Lerp)
+                        const targetCamPos = myPlayerPos.clone().add(this.cameraOffset);
+                        this.camera.position.lerp(targetCamPos, 0.08); // 0.08 - скорость сглаживания
+                        this.camera.lookAt(this.camera.position.x, 0, this.camera.position.z - this.cameraOffset.z);
+                    }
+
+                    for (const id in this.players) {
+                        const p = this.players[id];
+                        p.update(delta, time);
+
+                        if (p.uiElement || p.bubbleElement) {
+                            const vector = new THREE.Vector3();
+                            p.group.getWorldPosition(vector);
+                            vector.y += 5.5; // Высота над головой
+                            vector.project(this.camera);
+
+                            const x = (vector.x * 0.5 + 0.5) * this.container.clientWidth;
+                            const y = (vector.y * -0.5 + 0.5) * this.container.clientHeight;
+
+                            if (p.uiElement) {
+                                p.uiElement.style.left = `${x}px`;
+                                p.uiElement.style.top = `${y}px`;
+                            }
+                            if (p.bubbleElement) {
+                                p.bubbleElement.style.left = `${x}px`;
+                                p.bubbleElement.style.top = `${y - 25}px`;
+                            }
+                        }
+                    }
+
+                    // --- ПРОВЕРКА РАДИУСА ДЛЯ ГОЛОСОВОГО ЧАТА ---
+                    if (this.myId && this.players[this.myId]) {
+                        const myPlayer = this.players[this.myId];
+                        let nearestBot = null;
+                        let minDistance = 10; // Радиус общения (в игровых метрах)
+
+                        for (const id in this.players) {
+                            if (id === this.myId) continue;
+                            const dist = myPlayer.group.position.distanceTo(this.players[id].group.position);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                nearestBot = this.players[id];
+                            }
+                        }
+
+                        const micBtn = document.getElementById('proximity-mic-btn');
+                        if (nearestBot) {
+                            if (micBtn.classList.contains('hidden')) {
+                                micBtn.classList.remove('hidden');
+                                micBtn.classList.add('flex');
+                            }
+                            if (myPlayer.voiceZone) myPlayer.voiceZone.visible = true;
+                            this.nearestBotForVoice = nearestBot;
+                        } else {
+                            if (!micBtn.classList.contains('hidden')) {
+                                micBtn.classList.add('hidden');
+                                micBtn.classList.remove('flex');
+                            }
+                            if (myPlayer.voiceZone) myPlayer.voiceZone.visible = false;
+                            this.nearestBotForVoice = null;
+                        }
+                    }
+
+                    this.renderer.render(this.scene, this.camera);
+                }
+            }
+
+            class Avatar3D {
+                constructor(scene, name, colors, isBot) {
+                    this.scene = scene;
+                    this.name = name;
+                    
+                    this.group = new THREE.Group();
+                    
+                    // Цвета
+                    const shirtMat = new THREE.MeshStandardMaterial({ color: colors.shirt, roughness: 0.6 });
+                    const skinMat = new THREE.MeshStandardMaterial({ color: 0xffcc99, roughness: 0.4 });
+                    const hairMat = new THREE.MeshStandardMaterial({ color: colors.hair, roughness: 0.8 });
+                    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.9 });
+
+                    // Тело
+                    this.body = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.0, 1.8, 8), shirtMat);
+                    this.body.position.y = 2.2;
+                    this.body.castShadow = true;
+                    this.group.add(this.body);
+
+                    // Голова
+                    this.headGroup = new THREE.Group();
+                    this.headGroup.position.y = 4.0;
+                    const head = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.0, 2.0), skinMat);
+                    head.castShadow = true;
+                    this.headGroup.add(head);
+                    
+                    // Волосы (Шапка)
+                    const hair = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 2.2), hairMat);
+                    hair.position.y = 1.0;
+                    this.headGroup.add(hair);
+                    
+                    this.group.add(this.headGroup);
+
+                    // Руки 
+                    this.armL = new THREE.Group();
+                    this.armL.position.set(-1.6, 2.8, 0);
+                    const armLMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.6, 8), shirtMat);
+                    armLMesh.position.y = -0.8; 
+                    armLMesh.castShadow = true;
+                    this.armL.add(armLMesh);
+                    this.group.add(this.armL);
+
+                    this.armR = new THREE.Group();
+                    this.armR.position.set(1.6, 2.8, 0);
+                    const armRMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.6, 8), shirtMat);
+                    armRMesh.position.y = -0.8;
+                    armRMesh.castShadow = true;
+                    this.armR.add(armRMesh);
+                    this.group.add(this.armR);
+
+                    // Ноги
+                    this.legL = new THREE.Group();
+                    this.legL.position.set(-0.6, 1.3, 0);
+                    const legLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 0.8), pantsMat);
+                    legLMesh.position.y = -0.7;
+                    legLMesh.castShadow = true;
+                    this.legL.add(legLMesh);
+                    this.group.add(this.legL);
+
+                    this.legR = new THREE.Group();
+                    this.legR.position.set(0.6, 1.3, 0);
+                    const legRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 0.8), pantsMat);
+                    legRMesh.position.y = -0.7;
+                    legRMesh.castShadow = true;
+                    this.legR.add(legRMesh);
+                    this.group.add(this.legR);
+
+                    // Зона голосового чата (красный круг под ногами)
+                    this.voiceZone = new THREE.Mesh(
+                        new THREE.RingGeometry(9.5, 10, 32),
+                        new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide, transparent: true, opacity: 0.5 })
+                    );
+                    this.voiceZone.rotation.x = -Math.PI / 2;
+                    this.voiceZone.position.y = 0.05;
+                    this.voiceZone.visible = false;
+                    this.group.add(this.voiceZone);
+
+                    this.scene.add(this.group);
+
+                    this.targetPos = new THREE.Vector3(0, 0, 0);
+                    this.isMoving = false;
+                    this.speed = 10.0;
+                }
+
+                setPosition(x, z) {
+                    this.group.position.set(x, 0, z);
+                    this.targetPos.set(x, 0, z);
+                }
+
+                setTarget(x, z) {
+                    this.targetPos.set(x, 0, z);
+                    this.isMoving = true;
+                }
+
+                speak(text, uiContainer) {
+                    if (this.bubbleElement) this.bubbleElement.remove();
+                    this.bubbleElement = document.createElement('div');
+                    this.bubbleElement.className = 'chat-bubble-3d';
+                    this.bubbleElement.textContent = text;
+                    uiContainer.appendChild(this.bubbleElement);
+
+                    setTimeout(() => {
+                        if (this.bubbleElement) {
+                            this.bubbleElement.style.opacity = '0';
+                            setTimeout(() => {
+                                if (this.bubbleElement) this.bubbleElement.remove();
+                                this.bubbleElement = null;
+                            }, 300);
+                        }
+                    }, 4000);
+                }
+
+                update(delta, time) {
+                    const currentPos = this.group.position;
+                    const distance = currentPos.distanceTo(this.targetPos);
+
+                    if (distance > 0.2) {
+                        this.isMoving = true;
+                        
+                        // Движение к цели
+                        const direction = new THREE.Vector3().subVectors(this.targetPos, currentPos).normalize();
+                        this.group.position.add(direction.multiplyScalar(this.speed * delta));
+                        
+                        // Поворот к цели
+                        const angle = Math.atan2(direction.x, direction.z);
+                        this.group.rotation.y = angle;
+
+                        // Анимация ходьбы
+                        this.legL.position.z = Math.sin(time * 15) * 0.5;
+                        this.legR.position.z = Math.sin(time * 15 + Math.PI) * 0.5;
+                        this.armL.position.z = Math.sin(time * 15 + Math.PI) * 0.5;
+                        this.armR.position.z = Math.sin(time * 15) * 0.5;
+                        this.body.position.y = 2.2 + Math.abs(Math.sin(time * 15)) * 0.2; 
+                    } else {
+                        this.isMoving = false;
+                        
+                        // Возврат конечностей в исходное положение
+                        this.legL.position.z = 0;
+                        this.legR.position.z = 0;
+                        this.armL.position.z = 0;
+                        this.armR.position.z = 0;
+                        
+                        // Анимация дыхания (в покое)
+                        this.body.scale.y = 1 + Math.sin(time * 3) * 0.05;
+                        this.body.position.y = 2.2;
+                    }
+                }
+            }
+
+            let cafeEngine = null;
+            const joinCafeBtn = document.getElementById('joinCafeBtn');
+            const exitGameBtn = document.getElementById('exitGameBtn');
             const avatarInput = document.getElementById('avatarInput');
             const avatarSendBtn = document.getElementById('avatarSendBtn');
-            
-            // База данных "игроков" в комнате
-            const players = {};
-            let myId = 'player_me';
+            const uiOverlay = document.getElementById('ui-overlay');
 
-            // Цвета футболок для аватаров
-            const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-
-            // Функция создания аватара (DOM элемента)
-            function createAvatar(id, name, color, startX, startY) {
-                const el = document.createElement('div');
-                el.className = 'avatar';
-                el.id = id;
-                // Задаем цвет переменной CSS
-                el.style.setProperty('--avatar-color', color);
+            // --- ЛОГИКА ВХОДА В ИГРОВОЙ РЕЖИМ ---
+            joinCafeBtn.addEventListener('click', () => {
+                document.body.classList.add('game-mode'); // Активируем полноэкранный режим
                 
-                el.innerHTML = `
-                    <div class="avatar-shadow"></div>
-                    <div class="avatar-body"></div>
-                    <div class="avatar-head"></div>
-                    <div class="avatar-name">${name}</div>
-                `;
+                if (!cafeEngine) {
+                    cafeEngine = new Cafe3DEngine();
+                }
                 
-                // Устанавливаем начальную позицию
-                el.style.left = startX + 'px';
-                el.style.top = startY + 'px';
+                // Пересчитываем размеры Canvas после перехода в FullScreen
+                setTimeout(() => cafeEngine.resize(), 50); 
                 
-                roomArea.appendChild(el);
-                
-                players[id] = { el, x: startX, y: startY, name };
-            }
+                if (!cafeEngine.myId) {
+                    const name = document.getElementById('custName').value.trim() || "Водитель";
+                    const colors = {
+                        shirt: document.getElementById('custShirtColor').value,
+                        hair: document.getElementById('custHairColor').value
+                    };
 
-            // Функция движения
-            function moveAvatar(id, targetX, targetY) {
-                const p = players[id];
-                if(!p) return;
+                    cafeEngine.myId = 'player_me';
+                    // Спавнимся около кафе (зеленая зона)
+                    cafeEngine.addPlayer(cafeEngine.myId, name, colors, 10, 0);
+                    
+                    setTimeout(spawn3DBots, 1000);
+                }
+            });
 
-                p.x = targetX;
-                p.y = targetY;
-                
-                p.el.style.left = targetX + 'px';
-                p.el.style.top = targetY + 'px';
+            // --- ВЫХОД ИЗ ИГРЫ ---
+            exitGameBtn.addEventListener('click', () => {
+                document.body.classList.remove('game-mode');
+            });
 
-                // Добавляем класс анимации ходьбы
-                p.el.classList.add('is-walking');
-                
-                // Убираем класс после завершения CSS транзиции (1 секунда)
-                clearTimeout(p.walkTimeout);
-                p.walkTimeout = setTimeout(() => {
-                    p.el.classList.remove('is-walking');
-                }, 1000);
-            }
+            function spawn3DBots() {
+                const bots = [
+                    { id: 'b1', name: 'Саныч_54', col: { shirt: '#ef4444', hair: '#45220a' }, x: -10, z: -5 }, // На парковке
+                    { id: 'b2', name: 'Леха_V8', col: { shirt: '#3b82f6', hair: '#f59e0b' }, x: 15, z: -2 }, // У кафе
+                    { id: 'b3', name: 'Мария', col: { shirt: '#10b981', hair: '#b91c1c' }, x: 8, z: 10 }
+                ];
 
-            // Функция произнесения текста (облачко)
-            function speakAvatar(id, text) {
-                const p = players[id];
-                if(!p) return;
+                bots.forEach(b => {
+                    if(!cafeEngine.players[b.id]) {
+                        cafeEngine.addPlayer(b.id, b.name, b.col, b.x, b.z, true);
+                    }
+                });
 
-                // Удаляем старое облачко, если есть
-                const oldBubble = p.el.querySelector('.speech-bubble');
-                if(oldBubble) oldBubble.remove();
+                // Боты бегают по карте
+                setInterval(() => {
+                    if (!cafeEngine || !document.body.classList.contains('game-mode')) return;
+                    
+                    const bot = bots[Math.floor(Math.random() * bots.length)];
+                    const player = cafeEngine.players[bot.id];
+                    if (!player) return;
 
-                const bubble = document.createElement('div');
-                bubble.className = 'speech-bubble text-black';
-                bubble.textContent = text;
-                
-                p.el.appendChild(bubble);
+                    if (Math.random() > 0.3) {
+                        // Боты могут бегать от парковки (-20) до кафе (+20)
+                        const targetX = (Math.random() * 40) - 20;
+                        const targetZ = (Math.random() * 30) - 15;
+                        player.setTarget(targetX, targetZ);
+                    }
 
-                // Удаляем облачко через 4 секунды с анимацией
-                setTimeout(() => {
-                    bubble.style.animation = 'fadeOutBubble 0.3s forwards';
-                    setTimeout(() => bubble.remove(), 300);
+                    if (Math.random() > 0.7) {
+                        const phrases = ['Очередь на загрузку...', 'Тут кофе норм!', 'Погнали на Питер?', 'Всем шершавенькой 🚛'];
+                        player.speak(phrases[Math.floor(Math.random() * phrases.length)], uiOverlay);
+                    }
                 }, 4000);
             }
 
-            // Инициализация комнаты
-            // 1. Создаем себя (по центру)
-            createAvatar(myId, 'Я (Ты)', colors[1], 200, 200);
-
-            // 2. Создаем ботов для массовки
-            const botNames = ['Саныч', 'Мазай', 'Леха_V8'];
-            botNames.forEach((name, index) => {
-                createAvatar('bot_' + index, name, colors[index + 2], 100 + Math.random() * 300, 100 + Math.random() * 200);
-            });
-
-            // Управление своим персонажем (клик по полу)
-            roomArea.addEventListener('click', (e) => {
-                // Получаем координаты клика относительно контейнера комнаты
-                const rect = roomArea.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                
-                moveAvatar(myId, x, y);
-            });
-
-            // Отправка сообщений
-            function sendAvatarMessage() {
+            // Отправка сообщений в 3D чат
+            function sendCafeMessage() {
+                if (!cafeEngine || !cafeEngine.myId) return;
                 const text = avatarInput.value.trim();
                 if (!text) return;
 
-                speakAvatar(myId, text);
+                const myPlayer = cafeEngine.players[cafeEngine.myId];
+                myPlayer.speak(text, uiOverlay);
                 avatarInput.value = '';
 
-                // Реакция ботов на сообщение (случайная)
-                setTimeout(() => {
-                    if(Math.random() > 0.5) {
-                        const randomBotId = 'bot_' + Math.floor(Math.random() * botNames.length);
-                        const responses = ['Привет!', 'Как сам?', 'Дорога норм?', '+'];
-                        speakAvatar(randomBotId, responses[Math.floor(Math.random() * responses.length)]);
-                        
-                        // Бот поворачивается (идет) чуть-чуть в твою сторону
-                        const myPos = players[myId];
-                        moveAvatar(randomBotId, myPos.x + (Math.random()*60 - 30), myPos.y + (Math.random()*60 - 30));
-                    }
-                }, 2000 + Math.random() * 2000);
+                // Сворачиваем клавиатуру на телефоне
+                avatarInput.blur();
             }
 
-            avatarSendBtn.addEventListener('click', sendAvatarMessage);
+            avatarSendBtn.addEventListener('click', sendCafeMessage);
             avatarInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') sendAvatarMessage();
+                if (e.key === 'Enter') sendCafeMessage();
             });
 
-            // Симуляция жизни: боты иногда сами ходят и говорят
-            setInterval(() => {
-                const randomBotId = 'bot_' + Math.floor(Math.random() * botNames.length);
-                
-                // Шанс 50% пойти куда-то
-                if(Math.random() > 0.5) {
-                    const roomW = roomArea.clientWidth;
-                    const roomH = roomArea.clientHeight;
-                    moveAvatar(randomBotId, Math.random() * (roomW - 50) + 25, Math.random() * (roomH - 50) + 25);
-                }
+            /* ========================================================
+               5. ГОЛОСОВОЙ ЧАТ (PROXIMITY VOICE) - GEMINI API STT/TTS
+               ======================================================== */
+            const micBtn = document.getElementById('proximity-mic-btn');
+            let isRecording = false;
+            let recognition = null;
 
-                // Шанс 30% сказать случайную фразу
-                if(Math.random() > 0.7) {
-                    const idlePhrases = ['Пойду кофе возьму', 'Скоро выезжать...', 'Опять солярка подорожала', 'zzZ...', 'Кто на Москву?'];
-                    speakAvatar(randomBotId, idlePhrases[Math.floor(Math.random() * idlePhrases.length)]);
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.lang = 'ru-RU';
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+
+                recognition.onstart = () => {
+                    isRecording = true;
+                    micBtn.classList.add('animate-pulse', 'scale-110');
+                    micBtn.style.boxShadow = '0 0 30px rgba(239,68,68,0.9)';
+                };
+
+                recognition.onend = () => {
+                    isRecording = false;
+                    micBtn.classList.remove('animate-pulse', 'scale-110');
+                    micBtn.style.boxShadow = '';
+                };
+
+                recognition.onresult = async (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    
+                    if (cafeEngine && cafeEngine.myId && cafeEngine.nearestBotForVoice) {
+                        const myPlayer = cafeEngine.players[cafeEngine.myId];
+                        const bot = cafeEngine.nearestBotForVoice;
+                        
+                        // Показываем, что сказал игрок в 3D пространстве
+                        myPlayer.speak(transcript, document.getElementById('ui-overlay'));
+
+                        // Запрос к нейросети (Gemini) для генерации умного ответа
+                        bot.speak("...", document.getElementById('ui-overlay'));
+                        const responseText = await getBotResponse(transcript, bot.name);
+                        
+                        // Бот отвечает текстом
+                        bot.speak(responseText, document.getElementById('ui-overlay'));
+                        
+                        // Бот озвучивает ответ голосом (Gemini TTS)
+                        let voiceName = 'Charon'; 
+                        if (bot.name === 'Саныч_54') voiceName = 'Algenib'; // Глубокий, хриплый голос
+                        if (bot.name === 'Леха_V8') voiceName = 'Fenrir';   // Возбужденный, эмоциональный
+                        if (bot.name === 'Мария') voiceName = 'Leda';       // Молодой голос
+                        
+                        playTTS(responseText, voiceName);
+                    }
+                };
+            }
+
+            micBtn.addEventListener('click', () => {
+                if (!recognition) {
+                    alert("Ваш браузер не поддерживает голосовой ввод. Попробуйте Google Chrome.");
+                    return;
                 }
-            }, 5000);
+                if (isRecording) {
+                    recognition.stop();
+                } else {
+                    recognition.start();
+                }
+            });
+
+            // Функция получения ответа от LLM
+            async function getBotResponse(text, botName) {
+                const payload = {
+                    contents: [{ parts: [{ text: `Ты русский дальнобойщик по имени ${botName}. Твой коллега подошел к тебе на парковке (или в кафе) и сказал: "${text}". Ответь ему коротко, 1-2 предложения максимум, используя позитивный сленг дальнобойщиков. Будь дружелюбным.` }] }],
+                };
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+                
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json();
+                    return result.candidates[0].content.parts[0].text;
+                } catch (e) {
+                    console.error("AI Text Error:", e);
+                    return "Шшш... чет рация барахлит, не разобрал.";
+                }
+            }
+
+            // --- Вспомогательные функции для конвертации PCM (ответ от Gemini TTS) в WAV ---
+            function base64ToArrayBuffer(base64) {
+                var binary_string = window.atob(base64);
+                var len = binary_string.length;
+                var bytes = new Uint8Array(len);
+                for (var i = 0; i < len; i++) {
+                    bytes[i] = binary_string.charCodeAt(i);
+                }
+                return bytes.buffer;
+            }
+
+            function pcmToWav(pcmData, sampleRate) {
+                const numChannels = 1;
+                const bitsPerSample = 16;
+                const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+                const blockAlign = numChannels * (bitsPerSample / 8);
+                const dataSize = pcmData.length * 2;
+                const buffer = new ArrayBuffer(44 + dataSize);
+                const view = new DataView(buffer);
+
+                const writeString = (view, offset, string) => {
+                    for (let i = 0; i < string.length; i++) {
+                        view.setUint8(offset + i, string.charCodeAt(i));
+                    }
+                };
+
+                writeString(view, 0, 'RIFF');
+                view.setUint32(4, 36 + dataSize, true);
+                writeString(view, 8, 'WAVE');
+                writeString(view, 12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true);
+                view.setUint16(22, numChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, byteRate, true);
+                view.setUint16(32, blockAlign, true);
+                view.setUint16(34, bitsPerSample, true);
+                writeString(view, 36, 'data');
+                view.setUint32(40, dataSize, true);
+
+                let offset = 44;
+                for (let i = 0; i < pcmData.length; i++, offset += 2) {
+                    view.setInt16(offset, pcmData[i], true);
+                }
+                return new Blob([view], { type: 'audio/wav' });
+            }
+
+            // Функция синтеза речи (TTS)
+            async function playTTS(text, voiceName) {
+                const payload = {
+                    contents: [{ parts: [{ text: text }] }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: {
+                            voiceConfig: {
+                                prebuiltVoiceConfig: { voiceName: voiceName }
+                            }
+                        }
+                    },
+                    model: "gemini-2.5-flash-preview-tts"
+                };
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+                
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json();
+                    const part = result?.candidates?.[0]?.content?.parts?.[0];
+                    
+                    if (part && part.inlineData && part.inlineData.mimeType.startsWith("audio/")) {
+                        const audioData = part.inlineData.data;
+                        const sampleRate = parseInt(part.inlineData.mimeType.match(/rate=(\d+)/)[1], 10);
+                        const pcmData = base64ToArrayBuffer(audioData);
+                        const pcm16 = new Int16Array(pcmData);
+                        const wavBlob = pcmToWav(pcm16, sampleRate);
+                        const audioUrl = URL.createObjectURL(wavBlob);
+                        
+                        const audio = new Audio(audioUrl);
+                        audio.play();
+                    }
+                } catch (e) {
+                    console.error("TTS Error:", e);
+                }
+            }
 
         });
     </script>
