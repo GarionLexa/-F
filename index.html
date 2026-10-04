@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>От игрушки до фары | HUB</title>
+    
+    <!-- Подключаем Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Подключаем шрифты (Montserrat для заголовков, Fira Code для рации) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Подключаем Three.js для 3D фона -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            overflow-x: hidden;
+            font-family: 'Montserrat', sans-serif;
+            background-color: #050505; /* Глубокий черный фон-подложка */
+            color: #ffffff;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Контейнер для 3D фона */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Эффект матового стекла (Glassmorphism) */
+        .glass-panel {
+            background: rgba(15, 20, 30, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        /* Градиентный текст */
+        .text-gradient {
+            background: linear-gradient(135deg, #fbbf24 0%, #ea580c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Экран рации с эффектом ЭЛТ (старого монитора) */
+        .radio-screen {
+            background: radial-gradient(circle, #111827 0%, #000000 100%);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            position: relative;
+            overflow: hidden;
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Scanlines (полосы на экране рации) */
+        .radio-screen::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* Кастомный скроллбар для рации */
+        .radio-screen::-webkit-scrollbar { width: 6px; }
+        .radio-screen::-webkit-scrollbar-track { background: #000; }
+        .radio-screen::-webkit-scrollbar-thumb { background: #fbbf24; border-radius: 3px; }
+
+        /* Кнопка Тангента */
+        .btn-tangent {
+            background: linear-gradient(145deg, #fbbf24, #d97706);
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4), inset 0 2px 0 rgba(255,255,255,0.3);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            transition: all 0.1s ease;
+        }
+        .btn-tangent:active {
+            transform: scale(0.95) translateY(2px);
+            box-shadow: 0 0 5px rgba(245, 158, 11, 0.4), inset 0 4px 5px rgba(0,0,0,0.4);
+        }
+
+        /* 3D Параллакс карточки */
+        .parallax-card {
+            transform-style: preserve-3d;
+            transform: perspective(1000px);
+            transition: transform 0.1s ease-out; /* Плавный возврат */
+            will-change: transform;
+        }
+        .parallax-card-inner {
+            transform: translateZ(30px); /* Выдвигаем контент вперед */
+        }
+
+        /* Анимация пульса */
+        @keyframes pulse-neon {
+            0% { box-shadow: 0 0 5px #ef4444; }
+            50% { box-shadow: 0 0 20px #ef4444, 0 0 30px #ef4444; }
+            100% { box-shadow: 0 0 5px #ef4444; }
+        }
+        .neon-dot { animation: pulse-neon 2s infinite; }
+
+        .room-2d {
+            background: 
+                linear-gradient(rgba(15, 20, 30, 0.8), rgba(15, 20, 30, 0.9)),
+                url('data:image/svg+xml;utf8,<svg width="40" height="40" xmlns="http://www.w3.org/2000/svg"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/></svg>');
+            position: relative;
+            overflow: hidden;
+            border-radius: 1.5rem;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+            cursor: crosshair;
+        }
+
+        .avatar {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            transform: translate(-50%, -100%);
+            transition: left 1s linear, top 1s linear;
+            pointer-events: none; /* Чтобы клики проходили сквозь аватаров на пол комнаты */
+            z-index: 10;
+        }
+
+        /* Тельце человечка */
+        .avatar-body {
+            width: 20px;
+            height: 20px;
+            background: var(--avatar-color, #3b82f6);
+            border-radius: 50% 50% 10px 10px;
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5), inset 0 -3px 5px rgba(0,0,0,0.3);
+        }
+
+        /* Голова человечка */
+        .avatar-head {
+            width: 16px;
+            height: 16px;
+            background: #fcd34d; /* Цвет кожи */
+            border-radius: 50%;
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 2px 2px rgba(0,0,0,0.2);
+        }
+
+        /* Тень под человечком */
+        .avatar-shadow {
+            width: 24px;
+            height: 6px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 50%;
+            position: absolute;
+            bottom: -3px;
+            left: 50%;
+            transform: translateX(-50%);
+            filter: blur(2px);
+        }
+
+        /* Имя над головой */
+        .avatar-name {
+            position: absolute;
+            bottom: 35px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 10px;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            white-space: nowrap;
+        }
+
+        /* Облачко с текстом (Speech Bubble) */
+        .speech-bubble {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%) scale(0);
+            background: white;
+            color: black;
+            padding: 6px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transform-origin: bottom center;
+            animation: popInBubble 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            z-index: 20;
+        }
+
+        /* Хвостик облачка */
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px 5px 0;
+            border-style: solid;
+            border-color: white transparent transparent transparent;
+        }
+
+        @keyframes popInBubble {
+            from { transform: translateX(-50%) scale(0); }
+            to { transform: translateX(-50%) scale(1); }
+        }
+        @keyframes fadeOutBubble {
+            from { opacity: 1; transform: translateX(-50%) scale(1); }
+            to { opacity: 0; transform: translateX(-50%) scale(0.8); }
+        }
+
+        /* Анимация ходьбы (покачивание) */
+        @keyframes walk {
+            0% { transform: translateX(-50%) rotate(-5deg); }
+            50% { transform: translateX(-50%) rotate(5deg); }
+            100% { transform: translateX(-50%) rotate(-5deg); }
+        }
+        .is-walking .avatar-body {
+            animation: walk 0.4s infinite ease-in-out;
+        }
+
+        /* Кнопки навигации табов */
+        .nav-tab {
+            transition: all 0.2s;
+        }
+        .nav-tab.active {
+            background: linear-gradient(145deg, #fbbf24, #d97706);
+            color: black;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+        }
+        .nav-tab.inactive {
+            background: rgba(255,255,255,0.1);
+            color: #9ca3af;
+        }
+        .nav-tab.inactive:hover {
+            background: rgba(255,255,255,0.15);
+            color: white;
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-amber-500 selection:text-black min-h-screen flex flex-col">
+
+    <!-- Холст для 3D фона (дорожная пыль / снег навстречу) -->
+    <div id="canvas-container"></div>
+
+    <!-- Хедер с эффектом стекла -->
+    <header class="sticky top-0 z-50 glass-panel border-b-0 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-gradient-to-br from-amber-400 to-orange-600 rounded-lg shadow-[0_0_15px_rgba(245,158,11,0.5)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0M5 8a2 2 0 00-2 2v4h14V9a2 2 0 00-2-2H5z" />
+                    </svg>
+                </div>
+                <h1 class="text-xl md:text-2xl font-black tracking-widest uppercase text-gradient drop-shadow-md">От игрушки до фары</h1>
+            </div>
+
+            <div class="flex bg-black/40 p-1 rounded-xl border border-white/10">
+                <button id="tab-route" class="nav-tab active px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                        <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7h-3v7h.05a2.5 2.5 0 004.9 0H17a1 1 0 001-1V9l-4-2z" />
+                    </svg>
+                    В рейсе (Фура)
+                </button>
+                <button id="tab-cafe" class="nav-tab inactive px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                    </svg>
+                    Кафешка (Игрушки)
+                </button>
+            </div>
+
+            <div class="flex items-center gap-2 text-xs md:text-sm font-bold text-red-400 bg-red-950/50 backdrop-blur-sm px-3 py-1.5 rounded-full border border-red-500/30 shadow-[0_0_10px_rgba(220,38,38,0.2)]">
+                <div class="w-2.5 h-2.5 bg-red-500 rounded-full neon-dot"></div>
+                <span id="status-indicator">ОНЛАЙН</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-5xl mx-auto w-full px-4 py-8 z-10 relative">
+
+        <div id="view-route" class="space-y-10 block">
+            <!-- СЕКЦИЯ 1: РАЦИЯ -->
+            <section class="glass-panel rounded-3xl overflow-hidden relative group">
+
+            <div class="p-5 md:p-6 flex flex-col gap-4">
+                <!-- Экран чата -->
+                <div id="cbChatMessages" class="radio-screen rounded-xl p-4 h-64 md:h-80 overflow-y-auto space-y-4 text-sm md:text-base border border-white/5">
+                    <div class="text-gray-500 opacity-70 mb-4 select-none"># СИСТЕМА: Подключение к частоте 27.135 МГц... Успешно.</div>
+                    <div class="text-amber-500 drop-shadow-[0_0_2px_rgba(245,158,11,0.5)]">
+                        <span class="text-gray-500">['14:02']</span> <span class="text-amber-200">Саныч_54:</span> Ребят, на Челябинск как дорожка? Снег не пошел еще?
+                    </div>
+                    <div class="text-amber-500 drop-shadow-[0_0_2px_rgba(245,158,11,0.5)]">
+                        <span class="text-gray-500">['14:05']</span> <span class="text-amber-200">Мазай:</span> <span class="text-gray-400 italic opacity-70">[шшш]</span> Чисто пока, Саныч, лети смело.
+                    </div>
+                </div>
+
+                <!-- Панель ввода -->
+                <div class="flex flex-col md:flex-row gap-3">
+                    <div class="relative flex-1">
+                        <input type="text" id="cbInput" autocomplete="off" class="w-full bg-black/50 text-green-400 font-mono rounded-xl px-4 py-3 md:py-4 border border-white/10 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all placeholder-gray-600 shadow-inner text-base" placeholder="Текст для эфира...">
+                        <div class="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-red-500/50"></div>
+                    </div>
+                    <button id="cbSendBtn" class="btn-tangent text-black font-black tracking-widest uppercase px-6 py-3 md:py-4 rounded-xl flex justify-center items-center gap-2 select-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
+                        </svg>
+                        Тангента
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- СЕКЦИЯ 2: ДОСКА ФОТО -->
+        <section class="glass-panel rounded-3xl overflow-hidden">
+            <div class="p-5 md:p-6 border-b border-white/5 flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-black/20">
+                <div>
+                    <h2 class="text-xl font-bold flex items-center gap-3 text-white tracking-wide">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Вид из кабины
+                    </h2>
+                    <p class="text-sm text-gray-400 mt-1">Делитесь рабочими местами! Реал или симуляторы.</p>
+                </div>
+                <button class="bg-white/10 hover:bg-white/20 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 border border-white/20 backdrop-blur-md shadow-[0_4px_15px_rgba(0,0,0,0.3)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Закинуть фото
+                </button>
+            </div>
+            
+            <div class="p-5 md:p-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" id="cabViewGrid">
+                    
+                    <!-- Карточка 1 (3D Параллакс) -->
+                    <div class="parallax-card w-full aspect-[4/3] rounded-2xl cursor-pointer group">
+                        <div class="w-full h-full rounded-2xl overflow-hidden relative shadow-[0_10px_30px_rgba(0,0,0,0.6)] border border-white/10 bg-gray-900 parallax-card-inner">
+                            <!-- Заглушка, в реале тут будет <img> -->
+                            <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+                            
+                            <!-- Значок реал/игра -->
+                            <div class="absolute top-3 right-3 bg-amber-500 text-black text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider shadow-lg">РЕАЛ</div>
+                            
+                            <div class="absolute bottom-0 left-0 w-full p-4 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                                <p class="text-white font-bold text-lg drop-shadow-md">VOLVO FH16</p>
+                                <p class="text-amber-400 text-sm font-medium">@Igor_Trucker</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Карточка 2 -->
+                    <div class="parallax-card w-full aspect-[4/3] rounded-2xl cursor-pointer group">
+                        <div class="w-full h-full rounded-2xl overflow-hidden relative shadow-[0_10px_30px_rgba(0,0,0,0.6)] border border-white/10 bg-gray-900 parallax-card-inner">
+                            <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1588622143105-0219db1d604e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+                            <div class="absolute top-3 right-3 bg-blue-500 text-white text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider shadow-lg">ETS 2</div>
+                            <div class="absolute bottom-0 left-0 w-full p-4 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                                <p class="text-white font-bold text-lg drop-shadow-md">SCANIA S</p>
+                                <p class="text-amber-400 text-sm font-medium">@Gamer_Boy_99</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Карточка 3 -->
+                    <div class="parallax-card w-full aspect-[4/3] rounded-2xl cursor-pointer group sm:hidden md:block">
+                        <div class="w-full h-full rounded-2xl overflow-hidden relative shadow-[0_10px_30px_rgba(0,0,0,0.6)] border border-white/10 bg-gray-900 parallax-card-inner">
+                            <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1511651871221-a3f815a51a84?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+                            <div class="absolute top-3 right-3 bg-amber-500 text-black text-[10px] font-black px-2 py-1 rounded uppercase tracking-wider shadow-lg">РЕАЛ</div>
+                            <div class="absolute bottom-0 left-0 w-full p-4 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                                <p class="text-white font-bold text-lg drop-shadow-md">КАМАЗ 54901</p>
+                                <p class="text-amber-400 text-sm font-medium">@Siberian_Bear</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+        </div> <!-- Конец view-route -->
+
+        <div id="view-cafe" class="hidden h-[600px] flex-col glass-panel rounded-3xl border border-white/10 p-4">
+            
+            <div class="mb-4 flex justify-between items-end">
+                <div>
+                    <h2 class="text-2xl font-black text-amber-400 tracking-wider">ПРИДОРОЖНАЯ КАФЕШКА</h2>
+                    <p class="text-sm text-gray-400">Кликай по полу, чтобы ходить. Пиши в чат, чтобы говорить.</p>
+                </div>
+                <div class="text-xs bg-green-900/50 text-green-400 px-2 py-1 rounded border border-green-500/30">
+                    Людей в комнате: <span id="room-count">4</span>
+                </div>
+            </div>
+
+            <!-- Игровая зона 2D -->
+            <div id="room-2d-area" class="room-2d flex-1 w-full mb-4 relative">
+                <!-- Сюда будут добавляться аватары JS-скриптом -->
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white/5 font-black text-4xl select-none pointer-events-none">ПАРКОВКА</div>
+            </div>
+
+            <!-- Ввод сообщения для аватара -->
+            <div class="flex gap-3">
+                <input type="text" id="avatarInput" autocomplete="off" class="w-full bg-black/60 text-white rounded-xl px-4 py-3 border border-white/10 focus:outline-none focus:border-amber-500 transition-all placeholder-gray-500" placeholder="Что скажешь коллегам?">
+                <button id="avatarSendBtn" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-6 py-3 rounded-xl transition-colors">Сказать</button>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            /* ========================================================
+               1. НАСТРОЙКА 3D ФОНА (Ночная трасса / Звезды)
+               ======================================================== */
+            const canvasContainer = document.getElementById('canvas-container');
+            
+            // Базовые компоненты Three.js
+            const scene = new THREE.Scene();
+            
+            // Добавим легкий туман вдали
+            scene.fog = new THREE.FogExp2(0x050505, 0.0015);
+
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 2000);
+            camera.position.z = 500;
+
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            canvasContainer.appendChild(renderer.domElement);
+
+            // Создаем геометрию частиц (имитация пылинок/снега в свете фар)
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particlesCount = 1000;
+            const posArray = new Float32Array(particlesCount * 3);
+
+            for(let i = 0; i < particlesCount * 3; i++) {
+                // Размазываем частицы по большой площади
+                posArray[i] = (Math.random() - 0.5) * 2000; 
+            }
+
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+
+            // Материал частиц (светящиеся точки)
+            const particlesMaterial = new THREE.PointsMaterial({
+                size: 3,
+                color: 0xfbbf24, // Янтарный цвет
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+
+            const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(particlesMesh);
+
+            // Обработка движения мыши для параллакса фона
+            let mouseX = 0;
+            let mouseY = 0;
+            
+            document.addEventListener('mousemove', (event) => {
+                mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+                mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+            });
+
+            // Анимация 3D фона
+            function animate3D() {
+                requestAnimationFrame(animate3D);
+
+                // Движение частиц на зрителя (эффект езды)
+                const positions = particlesMesh.geometry.attributes.position.array;
+                for(let i = 2; i < particlesCount * 3; i += 3) {
+                    positions[i] += 4; // Скорость движения
+                    if(positions[i] > 600) {
+                        positions[i] = -1000; // Возврат вдаль
+                    }
+                }
+                particlesMesh.geometry.attributes.position.needsUpdate = true;
+
+                // Легкий поворот камеры за мышью
+                camera.position.x += (mouseX * 50 - camera.position.x) * 0.05;
+                camera.position.y += (mouseY * 50 - camera.position.y) * 0.05;
+                camera.lookAt(scene.position);
+
+                renderer.render(scene, camera);
+            }
+            animate3D();
+
+            // Адаптация при ресайзе окна
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+
+            /* ========================================================
+               2. ЛОГИКА РАЦИИ
+               ======================================================== */
+            const cbInput = document.getElementById('cbInput');
+            const cbSendBtn = document.getElementById('cbSendBtn');
+            const cbChatMessages = document.getElementById('cbChatMessages');
+
+            const botResponses = [
+                "[шшш] Принял, удачи братишка!",
+                "[шшш-пшш] На Казань пробка жесткая, имейте ввиду.",
+                "Шершавенькой!",
+                "[шшш] Коллеги, машинка работает на 84 километре, аккуратно.",
+                "Здарова всем! Как там погода на северах? [пшшш]"
+            ];
+
+            function addMessageToChat(text, sender = "Ты", isBot = false) {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = isBot ? "text-amber-500 drop-shadow-[0_0_2px_rgba(245,158,11,0.5)]" : "text-green-400 drop-shadow-[0_0_3px_rgba(34,197,94,0.6)]";
+                
+                const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                const nameColor = isBot ? "text-amber-200" : "text-green-200";
+                
+                msgDiv.innerHTML = `<span class="text-gray-500">['${time}']</span> <span class="${nameColor}">${sender}:</span> ${text}`;
+                
+                cbChatMessages.appendChild(msgDiv);
+                
+                // Плавный скролл вниз
+                cbChatMessages.scrollTo({
+                    top: cbChatMessages.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }
+
+            function sendCbMessage() {
+                const text = cbInput.value.trim();
+                if (!text) return;
+
+                addMessageToChat(text);
+                cbInput.value = '';
+
+                // Имитация ответа от других
+                setTimeout(() => {
+                    const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
+                    const randomBotName = "Неизвестный_" + Math.floor(Math.random() * 99);
+                    addMessageToChat(randomResponse, randomBotName, true);
+                }, 1500 + Math.random() * 3000);
+            }
+
+            cbSendBtn.addEventListener('click', sendCbMessage);
+            cbInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendCbMessage();
+            });
+
+
+            /* ========================================================
+               3. 3D ПАРАЛЛАКС ЭФФЕКТ ДЛЯ КАРТОЧЕК (При наведении)
+               ======================================================== */
+            const cards = document.querySelectorAll('.parallax-card');
+
+            cards.forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left; // x position within the element.
+                    const y = e.clientY - rect.top;  // y position within the element.
+                    
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    
+                    // Вычисляем угол поворота (чем дальше мышь от центра, тем сильнее наклон)
+                    const rotateX = ((y - centerY) / centerY) * -10; // max 10 deg
+                    const rotateY = ((x - centerX) / centerX) * 10;
+                    
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+                });
+
+                // Возврат в исходное положение при уводе мыши
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+                });
+            });
+
+
+            const tabRoute = document.getElementById('tab-route');
+            const tabCafe = document.getElementById('tab-cafe');
+            const viewRoute = document.getElementById('view-route');
+            const viewCafe = document.getElementById('view-cafe');
+            const statusIndicator = document.getElementById('status-indicator');
+
+            tabRoute.addEventListener('click', () => {
+                tabRoute.classList.replace('inactive', 'active');
+                tabCafe.classList.replace('active', 'inactive');
+                viewRoute.classList.remove('hidden');
+                viewRoute.classList.add('block');
+                viewCafe.classList.remove('flex');
+                viewCafe.classList.add('hidden');
+                statusIndicator.textContent = "В РЕЙСЕ";
+            });
+
+            tabCafe.addEventListener('click', () => {
+                tabCafe.classList.replace('inactive', 'active');
+                tabRoute.classList.replace('active', 'inactive');
+                viewCafe.classList.remove('hidden');
+                viewCafe.classList.add('flex');
+                viewRoute.classList.remove('block');
+                viewRoute.classList.add('hidden');
+                statusIndicator.textContent = "НА ОТДЫХЕ";
+            });
+
+
+            const roomArea = document.getElementById('room-2d-area');
+            const avatarInput = document.getElementById('avatarInput');
+            const avatarSendBtn = document.getElementById('avatarSendBtn');
+            
+            // База данных "игроков" в комнате
+            const players = {};
+            let myId = 'player_me';
+
+            // Цвета футболок для аватаров
+            const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+            // Функция создания аватара (DOM элемента)
+            function createAvatar(id, name, color, startX, startY) {
+                const el = document.createElement('div');
+                el.className = 'avatar';
+                el.id = id;
+                // Задаем цвет переменной CSS
+                el.style.setProperty('--avatar-color', color);
+                
+                el.innerHTML = `
+                    <div class="avatar-shadow"></div>
+                    <div class="avatar-body"></div>
+                    <div class="avatar-head"></div>
+                    <div class="avatar-name">${name}</div>
+                `;
+                
+                // Устанавливаем начальную позицию
+                el.style.left = startX + 'px';
+                el.style.top = startY + 'px';
+                
+                roomArea.appendChild(el);
+                
+                players[id] = { el, x: startX, y: startY, name };
+            }
+
+            // Функция движения
+            function moveAvatar(id, targetX, targetY) {
+                const p = players[id];
+                if(!p) return;
+
+                p.x = targetX;
+                p.y = targetY;
+                
+                p.el.style.left = targetX + 'px';
+                p.el.style.top = targetY + 'px';
+
+                // Добавляем класс анимации ходьбы
+                p.el.classList.add('is-walking');
+                
+                // Убираем класс после завершения CSS транзиции (1 секунда)
+                clearTimeout(p.walkTimeout);
+                p.walkTimeout = setTimeout(() => {
+                    p.el.classList.remove('is-walking');
+                }, 1000);
+            }
+
+            // Функция произнесения текста (облачко)
+            function speakAvatar(id, text) {
+                const p = players[id];
+                if(!p) return;
+
+                // Удаляем старое облачко, если есть
+                const oldBubble = p.el.querySelector('.speech-bubble');
+                if(oldBubble) oldBubble.remove();
+
+                const bubble = document.createElement('div');
+                bubble.className = 'speech-bubble text-black';
+                bubble.textContent = text;
+                
+                p.el.appendChild(bubble);
+
+                // Удаляем облачко через 4 секунды с анимацией
+                setTimeout(() => {
+                    bubble.style.animation = 'fadeOutBubble 0.3s forwards';
+                    setTimeout(() => bubble.remove(), 300);
+                }, 4000);
+            }
+
+            // Инициализация комнаты
+            // 1. Создаем себя (по центру)
+            createAvatar(myId, 'Я (Ты)', colors[1], 200, 200);
+
+            // 2. Создаем ботов для массовки
+            const botNames = ['Саныч', 'Мазай', 'Леха_V8'];
+            botNames.forEach((name, index) => {
+                createAvatar('bot_' + index, name, colors[index + 2], 100 + Math.random() * 300, 100 + Math.random() * 200);
+            });
+
+            // Управление своим персонажем (клик по полу)
+            roomArea.addEventListener('click', (e) => {
+                // Получаем координаты клика относительно контейнера комнаты
+                const rect = roomArea.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                moveAvatar(myId, x, y);
+            });
+
+            // Отправка сообщений
+            function sendAvatarMessage() {
+                const text = avatarInput.value.trim();
+                if (!text) return;
+
+                speakAvatar(myId, text);
+                avatarInput.value = '';
+
+                // Реакция ботов на сообщение (случайная)
+                setTimeout(() => {
+                    if(Math.random() > 0.5) {
+                        const randomBotId = 'bot_' + Math.floor(Math.random() * botNames.length);
+                        const responses = ['Привет!', 'Как сам?', 'Дорога норм?', '+'];
+                        speakAvatar(randomBotId, responses[Math.floor(Math.random() * responses.length)]);
+                        
+                        // Бот поворачивается (идет) чуть-чуть в твою сторону
+                        const myPos = players[myId];
+                        moveAvatar(randomBotId, myPos.x + (Math.random()*60 - 30), myPos.y + (Math.random()*60 - 30));
+                    }
+                }, 2000 + Math.random() * 2000);
+            }
+
+            avatarSendBtn.addEventListener('click', sendAvatarMessage);
+            avatarInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendAvatarMessage();
+            });
+
+            // Симуляция жизни: боты иногда сами ходят и говорят
+            setInterval(() => {
+                const randomBotId = 'bot_' + Math.floor(Math.random() * botNames.length);
+                
+                // Шанс 50% пойти куда-то
+                if(Math.random() > 0.5) {
+                    const roomW = roomArea.clientWidth;
+                    const roomH = roomArea.clientHeight;
+                    moveAvatar(randomBotId, Math.random() * (roomW - 50) + 25, Math.random() * (roomH - 50) + 25);
+                }
+
+                // Шанс 30% сказать случайную фразу
+                if(Math.random() > 0.7) {
+                    const idlePhrases = ['Пойду кофе возьму', 'Скоро выезжать...', 'Опять солярка подорожала', 'zzZ...', 'Кто на Москву?'];
+                    speakAvatar(randomBotId, idlePhrases[Math.floor(Math.random() * idlePhrases.length)]);
+                }
+            }, 5000);
+
+        });
+    </script>
+</body>
+</html>
