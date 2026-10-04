@@ -1,0 +1,56 @@
+using UnityEngine;
+using TMPro;
+using System.Collections;
+
+public class ChatBubble : MonoBehaviour
+{
+    [Header("Ссылки")]
+    public GameObject bubbleCanvasObject;
+    public TextMeshProUGUI bubbleText;
+
+    private Coroutine hideCoroutine;
+
+    private void Awake()
+    {
+        if (bubbleCanvasObject != null)
+        {
+            bubbleCanvasObject.SetActive(false);
+        }
+    }
+
+    // Метод вызова сообщения над головой
+    public void ShowMessage(string message, float displayTime = 5f)
+    {
+        if (bubbleText == null || bubbleCanvasObject == null) return;
+
+        bubbleText.text = message;
+        bubbleCanvasObject.SetActive(true);
+
+        // Если таймер уже шел, сбрасываем его
+        if (hideCoroutine != null)
+        {
+            StopCoroutine(hideCoroutine);
+        }
+
+        hideCoroutine = StartCoroutine(HideRoutine(displayTime));
+    }
+
+    private IEnumerator HideRoutine(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (bubbleCanvasObject != null)
+        {
+            bubbleCanvasObject.SetActive(false);
+        }
+    }
+
+    private void LateUpdate()
+    {
+        // Поворачиваем облачко лицом к активной камере, чтобы текст не был зеркальным
+        if (bubbleCanvasObject != null && bubbleCanvasObject.activeSelf && Camera.main != null)
+        {
+            transform.LookAt(transform.position + Camera.main.transform.rotation * Vector3.forward,
+                             Camera.main.transform.rotation * Vector3.up);
+        }
+    }
+}
